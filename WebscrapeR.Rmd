@@ -1,0 +1,328 @@
+---
+title: "Webscraping in R- Intro"
+output: html_notebook
+---
+
+# Rvest
+
+## HTML Basics
+
+- Tim Berners-Lee: Father of the the modern www.
+- An HTML document is a structured page with a tag hierarchy which crawlers use to extract desired data.
+- HTML UI code consists of elements in the UI that links to server code.
+- HTML server code consists of elements that support interaction with server data.
+- The UI code found on the web is the scrapers way into the data behind serves.
+- In the shiny app, one learns that when a file is say uploaded into the app when hosted locally, the server code is simply a way to access the data based on UI conditions chosen.
+- Based on the concept above, similarly, when a user is scraping a site hosted online, the UI class is used to trigger server code that fetches data already stored.
+- How is this applicable to web scraping? In web scraping, functions within scraping packages are designed to extract data from an html page based on the structure of the page.
+
+## Key Terminology
+
+- CSS: Cascading style sheets describes how HTML elements are to be displayed on screen, paper or other media CSS saves work in.
+- XPath: A class in the HTML document source code in which data is saved.
+
+## Webscrape Packages 
+
+- robotstxt(): First and most important. Check to see if the site allows web scraping.
+- webshot(): Used to detect website security features due to PhantomJS.
+- xml(): Parent to rvest and contains a bunch of functions to work with HTML documents.
+- httr(): A good one for APIs based on my experience so far
+- rvest(): Has the read_html() function within the package.
+- tidyverse(): Responsible for tidying up harvested or scraped data.
+- janitor(): Useful in cleaning data frame attribute names.
+- writexl(): Useful when writing data into a more friendly format like Microsoft Excel for data noobs.
+
+
+## Webscrape Workflow
+
+          1. url <- "https://www.yelp.com"
+          2. Use the Inspect(Q) option in any browser to trigger the html code reveal of the webpage.
+          3. Use robotstxt() and webshot() for initial site behavior.
+          4. Typically, an empty webshot indicates difficulty scraping and robotstxt() FALSE
+          indicates the site might not accept scraping the index.
+          5. Begin investigating css selectors or xpaths depending on the complexity of the scraping job.
+          6. Extract data and format accordingly.
+          7. Preferably, patterns should be recognized to facilitate creation of a scrape function.
+          
+## Webscrape Workflow - R CODE
+
+## R CODE - Simplest Scraping
+
+```{r}
+#Scraping wikipedia is as easy as this
+library(janitor)
+
+prison_break <- "https://en.wikipedia.org/wiki/List_of_countries_by_incarceration_rate"
+
+prison_tables <- prison_break %>%
+  read_html() %>%
+  html_nodes("table") %>%
+  html_table(fill = TRUE)
+
+prison_table_main <- prison_break %>%
+  read_html() %>%
+  html_nodes("table") %>%
+  html_table(fill = TRUE) %>%
+  .[[1]] %>%
+  clean_names()
+
+prison_table_main <-  prison_table_main[!apply(prison_table_main == "", 1, all), ] 
+head(prison_table_main)
+
+#How do I read my tables into the renv? Like below!
+for(i in 1:length(prison_tables)){
+  n <- "table"
+  assign(paste0(n, i), as.data.frame(prison_tables[i]))
+}
+
+# V2 - a fun show (taken from the linkedin map course)
+csi_url <- "https://en.wikipedia.org/wiki/List_of_CSI:_Crime_Scene_Investigation_episodes"
+
+csi_tables <- csi_url %>%
+  read_html() %>%
+  html_nodes("table") %>%
+  html_table(fill = TRUE)
+
+# append the data frames (2:n) from csi_tables 2 dimensional array
+episodes <- purrr::map_dfr(csi_tables[-1], dplyr::bind_rows)
+head(episodes)
+```
+
+
+## R CODE - Medium Complexity
+
+```{r}
+library(rvest)
+library(tidyverse)
+library(stringr)
+library(writexl)
+
+library(robotstxt)
+usethis::edit_r_environ()
+bk_url <- Sys.getenv('broadmore_url')
+paths_allowed(bk_url)
+
+library(webshot)
+aria_hidden_test <- webshot(bk_url)
+
+flat_bk_url <- readLines(con=bk_url, encoding = "UTF-8")
+save_txt("flat_bk_html.txt", flat_bk_url) #need an inhouse function based on sink()
+
+#important step in revealing aria-hidden elements
+parsed_bk_url <- xml2::xml_structure(read_html(bk_url))
+
+#Review Dates
+review_dates <- read_html(bk_url) %>%
+  html_elements(xpath = "//*[@class=' css-chan6m']") %>%
+  html_text() %>%
+  .[str_detect(., "^\\w{3}[\\s]\\d+[\\W][\\s]\\d{4}")] %>%
+  date_reformat(form = "R")
+
+review_dates_cleanR <- read_html(bk_url) %>% 
+  html_elements(xpath = "//*[@class= ' css-10n911v']") %>%
+  html_text() %>%
+  date_reformat(form = "R")
+
+review_dates_cleanNR <- read_html(bk_url) %>% 
+  html_elements(xpath = "//*[@class= ' css-10n911v']") %>%
+  html_text() %>%
+  date_reformat()
+
+review_dates_raw <- read_html(bk_url) %>% 
+  html_elements(xpath = "//*[@class= ' css-10n911v']") %>%
+  html_text() %>%
+  as.data.frame()
+
+#Review Comments
+review_comments <- read_html(bk_url) %>% 
+  html_elements(xpath = "//*[@class= 'comment__09f24__D0cxf css-qgunke']") %>%
+  html_text() %>%
+  as.data.frame()
+
+#Review People
+review_people <- read_html(bk_url) %>% 
+  html_elements(xpath = "//*[@class= ' css-174a15u']") %>%
+  html_text() %>%
+  .[c(1:nrow(review_comments)+1)] %>%
+  str_remove(' .*') %>%
+  as.data.frame()
+if(nrow(review_dates) < length(review_people) || !is.null(review_people)){
+  review_people <- as.data.frame(review_people[c(3:nrow(review_people)-1)])
+  colnames(review_people) <- c("reviewers")
+} else {
+  review_people
+}
+
+#Review States
+review_states <- read_html(bk_url) %>% 
+  html_elements(xpath = "//*[@class= ' css-174a15u']") %>%
+  html_text() %>%
+  .[c(1:nrow(review_comments)+1)] %>%
+  str_remove('.* ') %>%
+  str_extract("\\w{2}") %>%
+  as.data.frame()
+
+#Review ZipCodes
+review_zips <- read_html(bk_url) %>% 
+  html_elements(xpath = "//*[@class= ' css-174a15u']") %>%
+  html_text() %>%
+  .[c(1:nrow(review_comments)+1)] %>%
+  str_remove('.* ') %>%
+  str_extract("\\d+") %>%
+  as.data.frame()
+
+#Review Cities
+review_cities <- read_html(bk_url) %>% 
+  html_elements(xpath = "//*[@class= ' css-174a15u']") %>%
+  html_text() %>%
+  .[c(2:(nrow(review_comments)+1))] %>%
+  str_extract(' .*,') %>%
+  str_remove(',') %>%
+  str_remove(' *\\w{1}.') %>%
+  as.data.frame()
+
+#Review Ratings
+review_ratings <- read_html(bk_url) %>% 
+  html_elements(xpath = "//div[starts-with(@class, 'arrange-unit__09f24__rqHTg css-1qn0b6x')]") %>%
+  html_elements(xpath = ".//div[contains(@aria-label, 'star rating')]") %>%
+  html_attr('aria-label') %>%
+  str_remove_all(' star rating') %>%
+  as.numeric() %>% 
+  .[c(2:(nrow(review_dates)+1))] %>%
+  as.data.frame()
+if(nrow(review_dates) < length(review_ratings) || !is.null(review_ratings)){
+  review_ratings <- as.data.frame(review_ratings[c(2:nrow(review_ratings))])
+  colnames(review_ratings) <- c("review_stars")
+} else {
+  review_ratings
+}
+
+
+bk_reviews <- cbind(review_people, review_dates, review_dates_cleanR, review_dates_cleanNR, review_dates_raw, review_comments, review_ratings, review_cities, review_states, review_zips)
+
+colnames(bk_reviews) <- c("people","dates","datesR","datesNR","datesRAW","comments","ratings","cities","states","zips")
+
+write_xlsx(bk_reviews,path = "bk.xlsx")
+
+#Check the functions in this repository for paginated scraping using Rvest
+```
+
+## R CODE - Hard Complexity
+
+```{r}
+library(rvest)
+library(tidyverse)
+library(stringr)
+library(writexl)
+
+z_url <- Sys.getenv('zurl')
+z_url <- Sys.getenv('zurl_two')
+z_url <- Sys.getenv('zurl_detail')
+
+# The reference code is key to scraping zintellect job names 
+# and so Rselenium or dynamic browser needed
+# Alternative is using LinkedIn to scrape same data if available- Get reference
+# codes from indeed then use on zintellect or simply scrape from indeed directly
+rc <- read_html(z_url) %>% 
+  html_elements(xpath = "//*[@class= 'col-md-10 label-lh']") %>%
+  html_text() %>%
+  .[2] %>% 
+  str_trim()
+
+rc <- read_html(z_url) %>% 
+  html_elements(xpath = "//*[@class= 'col-md-10 label-lh']") %>%
+  html_text() %>%
+  .[2] %>% 
+  str_replace_all(" ", "") %>%
+  str_replace_all("\r\n", "")
+  
+library(robotstxt)
+paths_allowed(z_url)
+
+library(webshot)
+aria_hidden_test <- webshot(z_url)
+
+#important step in revealing aria-hidden elements
+#parsed_z_url <- xml2::xml_structure(read_html(z_url))
+
+#attempt to extract table
+zint_tables <- html_nodes(read_html(z_url1),'table')
+zdf <- zint_tables[1] %>% html_table(fill=TRUE)
+zdf <- zdf[[1]]
+head(zdf)
+
+# Overall a fail and even with LinkedIn, it will no be possible to scrape zint data without
+# a dynamic automated browser
+
+# Using PhantomJS
+# phantomJS can be installed from the webshot library
+
+# 1. send the phantomJS headless browser to download the webpage to a local dir
+system("C:/Users/GrandProf/AppData/Roaming/PhantomJS/phantomjs.exe pjs_script_zint.js")
+
+#2. scrape from local html file
+zint_local <- xml2::read_html("1.html") %>% 
+  rvest::html_nodes(".catalog-datatable") %>%
+  rvest::html_text()
+
+#3. FAILS-Test the V8 engine and that should yield a FAIL-Keep Moving Forward
+```
+
+
+# R Selenium
+
+## Webscrape Packages 
+
+- RSelenium(): Server instance creator.
+- tidyverse(): Data wrangling package.
+- netstat(): Port finder. Use with nmap externally.
+- wdman(): Used to obtain selenium webdrivers
+
+## Pre Selenium
+
+      1. Check java on windows (java -version). Use azuljava if you need it.
+      2. 
+
+
+```{r}
+library(RSelenium)
+library(wdman)
+library(netstat)
+
+selenium() #install webdrivers
+read_json('https://googlechromelabs.github.io/chrome-for-testing/known-good-versions.json')
+
+sel_obj <- selenium(retcommand = TRUE, check = F) 
+sel_obj
+
+binman::list_versions("geckodriver")
+rem_driver <- rsDriver(browser = "firefox", geckover = "0.33.0", verbose = FALSE, port = free_port())
+
+```
+   
+## Obtain Web Driver
+
+- Visit "https://sites.google.com/chromium.org/driver/downloads/version-selection?authuser=0"
+- It should have this page https://googlechromelabs.github.io/chrome-for-testing/#stable
+- Get the driver of interest
+- I used this once with python way back when I had no clue what was going on but just found this technical walkaround that helped me run a shopping bot from github. Hard to recall but when I get to using this in python, I will need to know how to manually workout webdrivers.
+- R takes care of chrome drivers for users via the 
+
+
+## Webscrape Workflow
+
+```{r}
+library(RSelenium)
+library(tidyverse)
+library(netstat)
+
+rem_driver <- rsDriver(browser = "firefox", geckover = "0.33.0", verbose = FALSE, port = free_port())
+
+remDr <- rem_driver$client
+remDr$open()
+remDr$navigate("https://orise.orau.gov/internships-fellowships/recent-graduates.html")
+
+rem_driver$server$stop()
+
+```
+

@@ -9,12 +9,11 @@ z_url <- Sys.getenv('zurl_detail')
 
 #iMBD Target:
 
-imdb <- "https://www.imdb.com/chart/top/?ref_=nv_mv_250"
-
-checkit <- read_html(imdb)
+hollywood <- Sys.getenv('imdb')
 
 #IMDB Scraper
-mov_names <- checkit %>% 
+mov_names <- hollywood %>% 
+  read_html() %>%
   html_elements(xpath = "//*[@class='ipc-title__text']") %>%
   html_text() %>%
   .[c(2:251)] %>%
@@ -23,8 +22,6 @@ mov_names <- checkit %>%
 
 colnames(mov_names) <- c("Movie_Titles")
 
-
-mov_names
   
 
 

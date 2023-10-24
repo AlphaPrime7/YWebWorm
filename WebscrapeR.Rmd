@@ -205,6 +205,22 @@ colnames(bk_reviews) <- c("people","dates","datesR","datesNR","datesRAW","commen
 write_xlsx(bk_reviews,path = "bk.xlsx")
 
 #Check the functions in this repository for paginated scraping using Rvest
+
+
+# 2. HOLLYWOOD
+
+hollywood <- Sys.getenv('imdb')
+
+mov_names <- hollywood %>% 
+  read_html() %>%
+  html_elements(xpath = "//*[@class='ipc-title__text']") %>%
+  html_text() %>%
+  .[c(2:251)] %>%
+  str_remove("\\d+[\\W][\\s]") %>%
+  as.data.frame()
+
+colnames(mov_names) <- c("Movie_Titles")
+head(mov_names)
 ```
 
 ## R CODE - Hard Complexity

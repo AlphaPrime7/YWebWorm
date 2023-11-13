@@ -87,8 +87,6 @@ csi_tables <- csi_url %>%
 episodes <- purrr::map_dfr(csi_tables[-1], dplyr::bind_rows)
 head(episodes)
 ```
-
-
 ## R CODE - Medium Complexity
 
 ```{r}
@@ -206,21 +204,6 @@ write_xlsx(bk_reviews,path = "bk.xlsx")
 
 #Check the functions in this repository for paginated scraping using Rvest
 
-
-# 2. HOLLYWOOD
-
-hollywood <- Sys.getenv('imdb')
-
-mov_names <- hollywood %>% 
-  read_html() %>%
-  html_elements(xpath = "//*[@class='ipc-title__text']") %>%
-  html_text() %>%
-  .[c(2:251)] %>%
-  str_remove("\\d+[\\W][\\s]") %>%
-  as.data.frame()
-
-colnames(mov_names) <- c("Movie_Titles")
-head(mov_names)
 ```
 
 ## R CODE - Hard Complexity
@@ -284,7 +267,6 @@ zint_local <- xml2::read_html("1.html") %>%
 #3. FAILS-Test the V8 engine and that should yield a FAIL-Keep Moving Forward
 ```
 
-
 # R Selenium
 
 ## Webscrape Packages 
@@ -331,13 +313,17 @@ rem_driver <- rsDriver(browser = "firefox", geckover = "0.33.0", verbose = FALSE
 library(RSelenium)
 library(tidyverse)
 library(netstat)
+library(rvest)
 
 rem_driver <- rsDriver(browser = "firefox", geckover = "0.33.0", verbose = FALSE, port = free_port())
 
+# Selenium
+
 remDr <- rem_driver$client
 remDr$open()
-remDr$navigate("https://orise.orau.gov/internships-fellowships/recent-graduates.html")
-
+remDr$navigate("https://www.indeed.com/q-Zintellect-jobs.html")
+z_intellect_jobs <- remDr$findElement(using = 'class', 'css-novqjp e1tiznh50')
+remDr$close()
 rem_driver$server$stop()
 
 ```

@@ -3,15 +3,11 @@ library(tidyverse)
 library(stringr)
 library(writexl)
 
-z_url <- Sys.getenv('zurl')
-z_url <- Sys.getenv('zurl_two')
-z_url <- Sys.getenv('zurl_detail')
-
 #iMBD Target:
 
 hollywood <- Sys.getenv('imdb')
 
-#IMDB Scraper
+#mov name
 mov_names <- hollywood %>% 
   read_html() %>%
   html_elements(xpath = "//*[@class='ipc-title__text']") %>%
@@ -21,6 +17,12 @@ mov_names <- hollywood %>%
   as.data.frame()
 
 colnames(mov_names) <- c("Movie_Titles")
+
+#ratings
+<span aria-label="IMDb rating: 9.3" 
+class="ipc-rating-star ipc-rating-star--base ipc-rating-star--imdb ratingGroup--imdb-rating"> 
+class="ipc-icon ipc-icon--star-inline" 
+
 
   
 
